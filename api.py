@@ -153,10 +153,44 @@ async def health_check():
         # 尝试重新加载模型
         load_model_and_scaler()
         return {"status": "healthy", "model_loaded": model_loaded}
-
+# 在predict函数中，标准化之前增加极端值检查
+def check_extreme_values(features):
+    """检测极端特征值并直接返回极高风险"""
+    # 定义各特征的极端值阈值
+    extreme_thresholds = {
+        'temperature': (0, 42),  # 温度超过42℃或低于0℃为极端
+        'humidity': (0, 90),     # 湿度超过90%或低于0%为极端
+        'ammonia_level': (0, 15),# 氨水平超过15为极端
+        'co2_level': (0, 4000),  # CO2超过4000为极端
+        'pig_density': (0, 3.0), # 猪密度超过3.0为极端
+    }
+    
+    # 单独处理采食量（只有过低才是极端）
+    feed_intake_min = 1.5
+    
+    feature_names = [
+        'temperature', 'humidity', 'ventilation_rate', 'ammonia_level', 'co2_level',
+        'pig_density', 'avg_feed_intake', 'water_quality', 'feed_quality', 'bedding_condition',
+        'vaccination_rate', 'disinfection_frequency', 'quarantine_days', 'staff_biosecurity_score',
+        'visitor_restriction_level', 'avg_age', 'breed_type', 'health_score',
+        'previous_incidence', 'mortality_rate_prev', 'season', 'is_rainy_season'
+    ]
+    
+    for i, feature_name in enumerate(feature_names):
+        if feature_name in extreme_thresholds:
+            min_val, max_val = extreme_thresholds[feature_name]
+            if features[0, i] < min_val or features[0, i] > max_val:
+                return True, f"{feature_name}值({features[0, i]})超出正常范围，属于极端情况"
+        # 单独处理采食量（只有过低才是极端）
+        elif feature_name == 'avg_feed_intake':
+            if features[0, i] < feed_intake_min:
+                return True, f"{feature_name}值({features[0, i]})过低，属于极端情况"
+    
+    return False, None
 # 单条预测端点
 @app.post("/predict", response_model=PredictionResponse)
 async def predict(request: PredictionRequest):
+
     if not model_loaded:
         # 尝试加载模型
         load_model_and_scaler()
@@ -189,6 +223,23 @@ async def predict(request: PredictionRequest):
             request.season,
             request.is_rainy_season
         ]).reshape(1, -1)
+        
+        # 检查是否存在极端值
+        is_extreme, reason = check_extreme_values(features)
+        if is_extreme:
+            # 对于极端值，直接返回极高风险
+            return PredictionResponse(
+                predicted_incidence=6.0,  # 固定返回超过5.0%的值
+                confidence=0.85,
+                risk_level="极高风险",
+                recommendations=[
+                    f"检测到极端值: {reason}",
+                    "立即采取紧急措施",
+                    "将猪群转移到适宜环境",
+                    "紧急联系兽医",
+                    "启动应急预案"
+                ]
+            )
         
         # 使用标量器进行数据标准化
         features_scaled = scaler.transform(features)

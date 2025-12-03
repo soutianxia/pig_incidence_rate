@@ -25,7 +25,7 @@ def test_predict(data, risk_level_name):
 low_risk_data = {
     # 环境因素 - 基于训练数据低风险样本特征
     "temperature": 34.0,  # 温度较高：34°C，参考训练数据中的低风险样本特征
-    "humidity": 42.0,     # 低湿度：42%，训练数据中低风险样本的典型湿度
+    "humidity": 99.0,     # 低湿度：42%，训练数据中低风险样本的典型湿度
     "ventilation_rate": 1800,  # 良好通风：1800，确保空气质量
     "ammonia_level": 2.3,      # 低氨水平：2.3，远低于有害水平
     "co2_level": 800,          # 低CO2：800，空气清新
